@@ -52,7 +52,7 @@ def aggregated_data_to_json_list(data: dict, device_info: DeviceInfo):
                     continue
                 db_dict['fields'][ch_name+f'{idx:d}'] = item
         else:
-            if math.isnan(val):
+            if val is None:
                 continue
             db_dict['fields'][ch_name] = val
     return [db_dict]
@@ -114,14 +114,14 @@ def handle_message(client, userdata, msg):
         try:
             if data_type == "agg_data":
                 db_client.write_points(aggregated_data_to_json_list(data, device_info), database=device_info.target_database)
-            #if data_type == "dataseries":
-            #    db_client.write_points(dataseries_to_json_list(data, device_info), database=device_info.target_database, time_precision='u')
+            if data_type == "dataseries":
+                db_client.write_points(dataseries_to_json_list(data, device_info), database=device_info.target_database, time_precision='u')
         except Exception as e:
             logger.error(getattr(e, 'message', repr(e)))
             
-
-client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="daqopen-gateway", clean_session=False)
-client.on_message = handle_message
-client.connect(MQTT_HOST)
-client.subscribe("dt/pqopen/#", qos=2)
-client.loop_forever()
+if __name__ == "__main__":
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="daqopen-gateway", clean_session=False)
+    client.on_message = handle_message
+    client.connect(MQTT_HOST)
+    client.subscribe("dt/pqopen/#", qos=2)
+    client.loop_forever()
