@@ -10,7 +10,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Dict
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 app_env = os.getenv("DAQOPEN_ENV", "development")
@@ -70,7 +70,8 @@ def handle_message(client, userdata, msg):
         return None
     
     # Database insertion
-    with InfluxDBClient(host=INFLUXDB_HOST, database=device_info["target_database"]) as db_client:
+
+    with InfluxDBClient(host=INFLUXDB_HOST) as db_client:
         data = decode_payload(msg.payload, encoding)
         if data_type == "agg_data":
             scalar_data = {key: value for key, value in data["data"].items() if isinstance(value, (float, int))}
@@ -84,11 +85,10 @@ def handle_message(client, userdata, msg):
                 "fields": scalar_data
             }
         if db_dict:
-            db_client.write_points([db_dict])
+            db_client.write_points([db_dict], database=device_info.target_database)
 
-if __name__ == "__main__":
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, clean_session=False)
-    client.on_message = handle_message
-    client.connect("localhost")
-    client.subscribe("dt/pqopen/#", qos=2)
-    client.loop_forever()
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="daqopen-gateway", clean_session=False)
+client.on_message = handle_message
+client.connect(MQTT_HOST)
+client.subscribe("dt/pqopen/#", qos=2)
+client.loop_forever()
