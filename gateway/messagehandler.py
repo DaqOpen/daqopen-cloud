@@ -9,6 +9,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from typing import Any, Dict
+import math
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -32,6 +33,43 @@ class DeviceInfo:
     daqinfo: Dict[str, Any] = field(default_factory=dict)
     last_seen: datetime.datetime = None
 
+
+def aggregated_data_to_json_list(data: dict, device_info: DeviceInfo):
+    db_dict = {
+        "measurement": "agg_data",
+        "tags": {
+            "device_id": device_info.device_id,
+            "location": device_info.location,
+            "interval_sec": data["interval_sec"]
+        },
+        "time": datetime.datetime.fromtimestamp(data["timestamp"], tz=datetime.UTC),
+        "fields": {}
+    }
+    for ch_name, val in data['data'].items():
+        if type(val) in [list]:
+            for idx, item in enumerate(val):
+                if math.isnan(item):
+                    continue
+                db_dict['fields'][ch_name+f'{idx:d}'] = item
+        else:
+            if math.isnan(val):
+                continue
+            db_dict['fields'][ch_name] = val
+    return [db_dict]
+
+def dataseries_to_json_list(data: dict, device_info: DeviceInfo):
+    db_list = []
+    tags = {'device_id': device_info.device_id,
+            'location': device_info.location}
+    # Iterate thru data Channels
+    for ch_name, ch_data in data['data'].items():
+        for idx, ts in enumerate(ch_data['timestamps']):
+            json_tmp = {'measurement': "dataseries",
+                        'tags': tags,
+                        'time': ts,
+                        'fields': {ch_name: ch_data['data'][idx]}}
+            db_list.append(json_tmp.copy())
+    return db_list
 
 def read_device_info(db_path: Path, device_id: str):
     # SQLite-Abfrage
@@ -74,18 +112,10 @@ def handle_message(client, userdata, msg):
     with InfluxDBClient(host=INFLUXDB_HOST) as db_client:
         data = decode_payload(msg.payload, encoding)
         if data_type == "agg_data":
-            scalar_data = {key: value for key, value in data["data"].items() if isinstance(value, (float, int))}
-            db_dict = {
-                "measurement": "agg_data",
-                "tags": {
-                    "device_id": device_info.device_id,
-                    "location": device_info.location
-                },
-                "time": datetime.datetime.fromtimestamp(data["timestamp"], tz=datetime.UTC),
-                "fields": scalar_data
-            }
-        if db_dict:
-            db_client.write_points([db_dict], database=device_info.target_database)
+            db_client.write_points(aggregated_data_to_json_list(data, device_info), database=device_info.target_database)
+        if data_type == "dataseries":
+            db_client.write_points(dataseries_to_json_list(data, device_info), database=device_info.target_database, time_precision='u')
+            
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="daqopen-gateway", clean_session=False)
 client.on_message = handle_message
