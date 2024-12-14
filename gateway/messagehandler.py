@@ -111,10 +111,13 @@ def handle_message(client, userdata, msg):
 
     with InfluxDBClient(host=INFLUXDB_HOST) as db_client:
         data = decode_payload(msg.payload, encoding)
-        if data_type == "agg_data":
-            db_client.write_points(aggregated_data_to_json_list(data, device_info), database=device_info.target_database)
-        if data_type == "dataseries":
-            db_client.write_points(dataseries_to_json_list(data, device_info), database=device_info.target_database, time_precision='u')
+        try:
+            if data_type == "agg_data":
+                db_client.write_points(aggregated_data_to_json_list(data, device_info), database=device_info.target_database)
+            #if data_type == "dataseries":
+            #    db_client.write_points(dataseries_to_json_list(data, device_info), database=device_info.target_database, time_precision='u')
+        except Exception as e:
+            logger.error(getattr(e, 'message', repr(e)))
             
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="daqopen-gateway", clean_session=False)
