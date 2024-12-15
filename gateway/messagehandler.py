@@ -10,6 +10,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Dict
 import math
+from copy import deepcopy
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class DeviceInfo:
 
 
 def aggregated_data_to_json_list(data: dict, device_info: DeviceInfo):
-    db_dict = {
+    db_dict_template = {
         "measurement": "agg_data",
         "tags": {
             "device_id": device_info.device_id,
@@ -45,17 +46,25 @@ def aggregated_data_to_json_list(data: dict, device_info: DeviceInfo):
         "time": datetime.datetime.fromtimestamp(data["timestamp"], tz=datetime.UTC),
         "fields": {}
     }
+    db_scalar_dict = deepcopy(db_dict_template)
+    db_list = []
+    db_vector_dict = {}
     for ch_name, val in data['data'].items():
         if type(val) in [list]:
             for idx, item in enumerate(val):
                 if math.isnan(item):
                     continue
-                db_dict['fields'][ch_name+f'{idx:d}'] = item
+                if idx not in db_vector_dict:
+                    db_vector_dict[idx] = deepcopy(db_dict_template)
+                    db_vector_dict[idx]["tags"]["order"] = idx
+                db_vector_dict[idx]["fields"][ch_name] = item
         else:
             if val is None:
                 continue
-            db_dict['fields'][ch_name] = val
-    return [db_dict]
+            db_scalar_dict['fields'][ch_name] = val
+    db_list.append(db_scalar_dict)
+    db_list.extend(db_vector_dict.values())
+    return db_list
 
 def dataseries_to_json_list(data: dict, device_info: DeviceInfo):
     db_list = []
