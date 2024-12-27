@@ -56,7 +56,7 @@ def aggregated_data_to_json_list(data: dict, device_info: DeviceInfo):
                     continue
                 if idx not in db_vector_dict:
                     db_vector_dict[idx] = deepcopy(db_dict_template)
-                    db_vector_dict[idx]["tags"]["order"] = idx
+                    db_vector_dict[idx]["tags"]["order"] = f"{idx:02d}"
                 db_vector_dict[idx]["fields"][ch_name] = item
         else:
             if val is None:
