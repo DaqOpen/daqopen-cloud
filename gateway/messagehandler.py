@@ -106,7 +106,7 @@ def cache_data(data: dict, target_database: str):
     data_dict = {"data": data,
                  "target_database:": target_database}
     conn = sqlite3.connect("data_cache.sq3")
-    conn.execute("CREATE TABLE IF NOT EXISTS data_cache (id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT, target_database TEXT);")
+    conn.execute("CREATE TABLE IF NOT EXISTS data_cache (data TEXT, target_database TEXT);")
     with conn:
         conn.execute("INSERT INTO data_cache VALUES (:data, :target_database);", data_dict)
 
