@@ -102,13 +102,11 @@ def decode_payload(payload: bytes, encoding: str):
 
     return payload_dict
 
-def cache_data(data: dict, target_database: str):
-    data_dict = {"data": json.dumps(data),
-                 "target_database:": target_database}
+def cache_data(data_type: str, device_info: DeviceInfo, data: dict):
     conn = sqlite3.connect("data_cache.sq3")
-    conn.execute("CREATE TABLE IF NOT EXISTS data_cache (data TEXT, target_database TEXT);")
+    conn.execute("CREATE TABLE IF NOT EXISTS data_cache (id INTEGER PRIMARY KEY, data_type TEXT, device_info TEXT, data TEXT);")
     with conn:
-        conn.execute("INSERT INTO data_cache VALUES (:data, :target_database);", data_dict)
+        conn.execute("INSERT INTO data_cache (data_type, device_info, data) VALUES (?, ?, ?);", (data_type, json.dumps(device_info.__dict__), json.dumps(data)))
 
 def handle_message(client, userdata, msg):
     logger.debug("New Message")
@@ -129,17 +127,13 @@ def handle_message(client, userdata, msg):
         data = decode_payload(msg.payload, encoding)
         try:
             target_database = device_info.target_database
-            data_to_insert = None
             if data_type == "agg_data":
-                data_to_insert = aggregated_data_to_json_list(data, device_info)
-                db_client.write_points(data_to_insert, database=target_database)
+                db_client.write_points(aggregated_data_to_json_list(data, device_info), database=target_database)
             if data_type == "dataseries":
-                data_to_insert = dataseries_to_json_list(data, device_info)
-                db_client.write_points(data_to_insert, database=target_database, time_precision='u')
+                db_client.write_points(dataseries_to_json_list(data, device_info), database=target_database, time_precision='u')
         except Exception as e:
             logger.error(getattr(e, 'message', repr(e)))
-            if data_to_insert:
-                cache_data(data_to_insert, target_database)
+            cache_data(data_type, device_info, data)
 
 if __name__ == "__main__":
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="daqopen-gateway", clean_session=False)
