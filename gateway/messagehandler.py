@@ -102,6 +102,14 @@ def decode_payload(payload: bytes, encoding: str):
 
     return payload_dict
 
+def cache_data(data: dict, target_database: str):
+    data_dict = {"data": data,
+                 "target_database:": target_database}
+    conn = sqlite3.connect("data_cache.sq3")
+    conn.execute("CREATE TABLE IF NOT EXISTS data_cache (id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT, target_database TEXT);")
+    with conn:
+        conn.execute("INSERT INTO data_cache VALUES (:data, :target_database);", data_dict)
+
 def handle_message(client, userdata, msg):
     logger.debug("New Message")
     parts = msg.topic.split("/")
@@ -117,17 +125,22 @@ def handle_message(client, userdata, msg):
         return None
     
     # Database insertion
-
     with InfluxDBClient(host=INFLUXDB_HOST) as db_client:
         data = decode_payload(msg.payload, encoding)
         try:
+            target_database = device_info.target_database
+            data_to_insert = None
             if data_type == "agg_data":
-                db_client.write_points(aggregated_data_to_json_list(data, device_info), database=device_info.target_database)
+                data_to_insert = aggregated_data_to_json_list(data, device_info)
+                db_client.write_points(data_to_insert, database=target_database)
             if data_type == "dataseries":
-                db_client.write_points(dataseries_to_json_list(data, device_info), database=device_info.target_database, time_precision='u')
+                data_to_insert = dataseries_to_json_list(data, device_info)
+                db_client.write_points(data_to_insert, database=target_database, time_precision='u')
         except Exception as e:
             logger.error(getattr(e, 'message', repr(e)))
-            
+            if data_to_insert:
+                cache_data(data_to_insert, target_database)
+
 if __name__ == "__main__":
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="daqopen-gateway", clean_session=False)
     client.on_message = handle_message
