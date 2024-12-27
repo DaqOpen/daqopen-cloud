@@ -103,7 +103,7 @@ def decode_payload(payload: bytes, encoding: str):
     return payload_dict
 
 def cache_data(data: dict, target_database: str):
-    data_dict = {"data": data,
+    data_dict = {"data": json.dumps(data),
                  "target_database:": target_database}
     conn = sqlite3.connect("data_cache.sq3")
     conn.execute("CREATE TABLE IF NOT EXISTS data_cache (data TEXT, target_database TEXT);")
