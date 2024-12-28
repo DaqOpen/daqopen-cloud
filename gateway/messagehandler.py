@@ -109,6 +109,25 @@ def cache_data(data_type: str, device_info: DeviceInfo, data: dict):
     with conn:
         conn.execute("INSERT INTO data_cache (data_type, device_info, data) VALUES (?, ?, ?);", (data_type, json.dumps(device_info.__dict__), json.dumps(data)))
 
+def get_cached_data() -> tuple | None:
+    conn = sqlite3.connect(CACHE_PATH)
+    with conn:
+        res = conn.execute("SELECT * FROM data_cache LIMIT 1;")
+        row = res.fetchone()
+        if row:
+            id = row[0]
+            data_type = row[1]
+            device_info = DeviceInfo(**json.loads(row[2]))
+            data = json.loads(row[3])
+            return id, data_type, device_info, data
+        else:
+            return None
+    
+def delete_cached_data(id: int):
+    conn = sqlite3.connect(CACHE_PATH)
+    with conn:
+        res = conn.execute("DELETE FROM data_cache WHERE id = ?;", (id,))
+
 def handle_message(client, userdata, msg):
     logger.debug("New Message")
     parts = msg.topic.split("/")
@@ -124,21 +143,41 @@ def handle_message(client, userdata, msg):
         return None
     
     # Database insertion
+    data = decode_payload(msg.payload, encoding)
+    res = insert_data_database(data_type, device_info, data)
+    if not res:
+        cache_data(data_type, device_info, data)
+
+
+def insert_data_database(data_type: str, device_info: DeviceInfo, data: dict):
     with InfluxDBClient(host=INFLUXDB_HOST) as db_client:
-        data = decode_payload(msg.payload, encoding)
         try:
             target_database = device_info.target_database
             if data_type == "agg_data":
                 db_client.write_points(aggregated_data_to_json_list(data, device_info), database=target_database)
             if data_type == "dataseries":
                 db_client.write_points(dataseries_to_json_list(data, device_info), database=target_database, time_precision='u')
+            result = True
         except Exception as e:
             logger.error(getattr(e, 'message', repr(e)))
-            cache_data(data_type, device_info, data)
+            result = False
+    return result
+            
 
 if __name__ == "__main__":
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="daqopen-gateway", clean_session=False)
     client.on_message = handle_message
     client.connect(MQTT_HOST)
     client.subscribe("dt/pqopen/#", qos=2)
-    client.loop_forever()
+    while True:
+        client.loop(timeout=1)
+        cached_data = get_cached_data()
+        if cached_data:
+            res = insert_data_database(cached_data[1], cached_data[2], cached_data[3])
+            logger.debug("Insert cached data to database...")
+            if res:
+                delete_cached_data(cached_data[0])
+                logger.debug(f"Insert was successful - delete cache with id={cached_data[0]:d}")
+
+
+
