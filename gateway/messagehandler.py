@@ -23,6 +23,7 @@ if app_env == "development":
 CONFIG_DB_PATH = Path(os.getenv("DAQOPEN_CONFIG_DB_PATH", "../devices.sq3"))
 INFLUXDB_HOST = os.getenv("DAQOPEN_INFLUXDB_HOST", "localhost")
 MQTT_HOST = os.getenv("DAQOPEN_MQTT_HOST","localhost")
+CACHE_PATH = os.getenv("DAQOPEN_CACHE_PATH","../data_cache.sq3")
 
 @dataclass
 class DeviceInfo:
@@ -103,7 +104,7 @@ def decode_payload(payload: bytes, encoding: str):
     return payload_dict
 
 def cache_data(data_type: str, device_info: DeviceInfo, data: dict):
-    conn = sqlite3.connect("data_cache.sq3")
+    conn = sqlite3.connect(CACHE_PATH)
     conn.execute("CREATE TABLE IF NOT EXISTS data_cache (id INTEGER PRIMARY KEY, data_type TEXT, device_info TEXT, data TEXT);")
     with conn:
         conn.execute("INSERT INTO data_cache (data_type, device_info, data) VALUES (?, ?, ?);", (data_type, json.dumps(device_info.__dict__), json.dumps(data)))
