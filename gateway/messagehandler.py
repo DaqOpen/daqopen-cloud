@@ -81,6 +81,20 @@ def dataseries_to_json_list(data: dict, device_info: DeviceInfo):
             db_list.append(json_tmp.copy())
     return db_list
 
+def event_to_json_list(data: dict, device_info: DeviceInfo):
+    json_tmp = {
+        "measurement": "events",
+        "tags": {
+            'device_id': device_info.device_id,
+            'location': device_info.location,
+            'event_type': data["event_type"],
+            'channel': data["channel"]
+        },
+        "time": datetime.datetime.fromtimestamp(data["timestamp"], tz=datetime.UTC),
+        "fields": data["data"]
+    }
+    return [json_tmp]
+
 def read_device_info(db_path: Path, device_id: str):
     # SQLite-Abfrage
     conn = sqlite3.connect(db_path.as_posix())
@@ -157,6 +171,8 @@ def insert_data_database(data_type: str, device_info: DeviceInfo, data: dict):
                 db_client.write_points(aggregated_data_to_json_list(data, device_info), database=target_database)
             if data_type == "dataseries":
                 db_client.write_points(dataseries_to_json_list(data, device_info), database=target_database, time_precision='u')
+            if data_type == "event":
+                db_client.write_points(event_to_json_list(data, device_info), database=target_database, time_precision='u')
             result = True
         except Exception as e:
             logger.error(getattr(e, 'message', repr(e)))
