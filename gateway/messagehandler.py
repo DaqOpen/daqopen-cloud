@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict
 import math
 from copy import deepcopy
+import time
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -183,10 +184,10 @@ def insert_data_database(data_type: str, device_info: DeviceInfo, data: dict):
 if __name__ == "__main__":
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="daqopen-gateway", clean_session=False)
     client.on_message = handle_message
-    client.connect(MQTT_HOST)
+    client.connect_async(MQTT_HOST)
     client.subscribe("dt/pqopen/#", qos=2)
+    client.loop_start()
     while True:
-        client.loop(timeout=1)
         cached_data = get_cached_data()
         if cached_data:
             res = insert_data_database(cached_data[1], cached_data[2], cached_data[3])
@@ -194,6 +195,7 @@ if __name__ == "__main__":
             if res:
                 delete_cached_data(cached_data[0])
                 logger.debug(f"Insert was successful - delete cache with id={cached_data[0]:d}")
-
+        else:
+            time.sleep(1)
 
 
