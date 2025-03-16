@@ -24,7 +24,7 @@ if app_env == "development":
 CONFIG_DB_PATH = Path(os.getenv("DAQOPEN_CONFIG_DB_PATH", "../devices.sq3"))
 INFLUXDB_HOST = os.getenv("DAQOPEN_INFLUXDB_HOST", "localhost")
 MQTT_HOST = os.getenv("DAQOPEN_MQTT_HOST","localhost")
-MQTT_PORT = os.getenv("DAQOPEN_MQTT_PORT",1883)
+MQTT_PORT = int(os.getenv("DAQOPEN_MQTT_PORT",1883))
 CACHE_PATH = os.getenv("DAQOPEN_CACHE_PATH","../data_cache.sq3")
 
 @dataclass
