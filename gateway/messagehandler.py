@@ -144,6 +144,11 @@ def delete_cached_data(id: int):
     with conn:
         res = conn.execute("DELETE FROM data_cache WHERE id = ?;", (id,))
 
+# Callback function for connection handling
+def on_connect(client, userdata, flags, reason_code, properties):
+    logger.info(f"Connected with result code {reason_code}")
+    client.subscribe("pqopen/dt/#", qos=2)
+
 def handle_message(client, userdata, msg):
     logger.debug("New Message")
     parts = msg.topic.split("/")
@@ -185,8 +190,8 @@ def insert_data_database(data_type: str, device_info: DeviceInfo, data: dict):
 if __name__ == "__main__":
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="daqopen-gateway", clean_session=False)
     client.on_message = handle_message
+    client.on_connect = on_connect
     client.connect_async(MQTT_HOST, MQTT_PORT)
-    client.subscribe("pqopen/dt/#", qos=2)
     client.loop_start()
     while True:
         cached_data = get_cached_data()
