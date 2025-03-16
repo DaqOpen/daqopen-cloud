@@ -24,6 +24,7 @@ if app_env == "development":
 CONFIG_DB_PATH = Path(os.getenv("DAQOPEN_CONFIG_DB_PATH", "../devices.sq3"))
 INFLUXDB_HOST = os.getenv("DAQOPEN_INFLUXDB_HOST", "localhost")
 MQTT_HOST = os.getenv("DAQOPEN_MQTT_HOST","localhost")
+MQTT_PORT = os.getenv("DAQOPEN_MQTT_PORT",1883)
 CACHE_PATH = os.getenv("DAQOPEN_CACHE_PATH","../data_cache.sq3")
 
 @dataclass
@@ -184,8 +185,8 @@ def insert_data_database(data_type: str, device_info: DeviceInfo, data: dict):
 if __name__ == "__main__":
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="daqopen-gateway", clean_session=False)
     client.on_message = handle_message
-    client.connect_async(MQTT_HOST)
-    client.subscribe("dt/pqopen/#", qos=2)
+    client.connect_async(MQTT_HOST, MQTT_PORT)
+    client.subscribe("pqopen/dt/#", qos=2)
     client.loop_start()
     while True:
         cached_data = get_cached_data()
